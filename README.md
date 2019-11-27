@@ -1,5 +1,5 @@
 # stm32f4_parkingproject
-stm32f4 oto park projesi
-servo motor kontrol edilecek
-usart üzerinden QT haberleşitirlecek
-rfıd modülü kullanılıp doluluk test edilecek
+1)stm32f4 oto park projesi
+2)servo motor kontrol edilecek
+3)usart üzerinden QT haberleşitirlecek
+4)rfıd modülü kullanılıp doluluk test edilecek
