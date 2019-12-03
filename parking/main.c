@@ -2,21 +2,25 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-
+#define BUFFER_LENGHT 500
 
 void usartinit(void);
+static void proje_init(void);
 void USART_Puts(USART_TypeDef* USARTx,volatile char *s);
 char USART_read(void);
+static uint16_t WriteIndex=0;
+static void Clear_Buffer(void);
 static void Delay(__IO uint32_t bekle);
 void SysTick_Handler(void);
 void Bekleme(void);
 void servoup(void);
 void servodown(void);
-void Gpio_led_init();
+void Gpio_led_init(void);
 char str[50];
 uint32_t i=0,a=0;
-char gelenVeri[50] ;
+char gelenVeri[BUFFER_LENGHT];
 volatile uint32_t Delay_ms; 
+
 
 
 
@@ -29,29 +33,18 @@ int main(){
 	USART_Puts(USART2,str);
 
 	*/
+
 	usartinit();
 	Gpio_led_init();
-	
-	  while(1){
-	sprintf(str,"Firatmaca \r \n");
-	USART_SendData(USART2,*str);
-	       /*
-        if(gelenVeri[1] == '1')
-        { 
-					
-					 GPIO_ResetBits(GPIOD,GPIO_Pin_12);
-					GPIO_ResetBits(GPIOD,GPIO_Pin_13);
-					GPIO_ResetBits(GPIOD,GPIO_Pin_14);
-					GPIO_ResetBits(GPIOD,GPIO_Pin_15);
-				}
-				else{
-			
-					 GPIO_SetBits(GPIOD,GPIO_Pin_12);
-					GPIO_SetBits(GPIOD,GPIO_Pin_13);
-					GPIO_SetBits(GPIOD,GPIO_Pin_14);
-					GPIO_SetBits(GPIOD,GPIO_Pin_15);
-				}
- */
+	Clear_Buffer();
+	while(1){
+		proje_init();
+		
+		
+	}
+	 
+				
+  /*
 	Bekleme();
 	Delay(1);
 	 servoup();
@@ -59,10 +52,50 @@ int main(){
 	servodown();
 	Delay(1);
 	 servoup();
-		
+		*/
+
 }
+static void proje_init(void){
+   
+          if(strstr(gelenVeri,"open")!=NULL)
+        { 
+	        Bekleme();
+					Delay(1);			
+					servoup();
+					
+					GPIO_SetBits(GPIOD,GPIO_Pin_15);
+					Clear_Buffer();
+					
+					
+				}
+				else if(strstr(gelenVeri,"close")!=NULL){
+			     Bekleme();
+					Delay(1);
+					servodown();
+					
+					GPIO_SetBits(GPIOD,GPIO_Pin_14);
+			    Clear_Buffer();
+				}
+				
+				
+		   
+			
 }
-void Gpio_led_init(){
+
+
+
+static void Clear_Buffer(void)
+{
+    uint16_t x;
+
+    for(x=0;x<BUFFER_LENGHT;x++)
+        gelenVeri[x] = 0;
+ 
+        WriteIndex=0;   
+}
+
+
+void Gpio_led_init(void){
 GPIO_InitTypeDef GPIO_InitStructure ;
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD,ENABLE);
 	GPIO_InitStructure.GPIO_Mode=GPIO_Mode_OUT; 
@@ -76,6 +109,7 @@ GPIO_InitTypeDef GPIO_InitStructure ;
 void usartinit(void){
  GPIO_InitTypeDef GPIO_InitStructure;
 	USART_InitTypeDef USART_InitStructure;
+	 NVIC_InitTypeDef NVIC_InitStructure;
 	
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2,ENABLE); // transmitter tx A2 GPIOya bagli usartta
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA,ENABLE);
@@ -98,8 +132,36 @@ void usartinit(void){
 	USART_InitStructure.USART_WordLength=USART_WordLength_8b;
 	USART_Init(USART2,&USART_InitStructure);
 	
+	USART_ITConfig(USART2, USART_IT_RXNE, ENABLE); // USART1 Rx interrupt aktif ediliyor
+
+ NVIC_InitStructure.NVIC_IRQChannel = USART2_IRQn; // USART1 interrupt ina ince ayar vermek istiyoruz.
+ NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;// Öncelik olarak bu interrupt kaynagina 0 veriyoruz. ( 0 yazarak En öncelikli kaynak yapiyoruz )
+ NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0; // Kendi bagli oldugu vektordeki alt grup içinde de en öncelikli olarak kurduk
+ NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE; // USART1 interrupt kanali aktif edilir.
+ NVIC_Init(&NVIC_InitStructure); // Yaptigimiz ayarlari NVIC birimine yüklüyoruz.
+
 	USART_Cmd(USART2,ENABLE);
 }
+
+void USART2_IRQHandler(void){
+	
+ // USART1 RX interrupt flag kontrol edilir.
+ if( USART_GetITStatus(USART2, USART_IT_RXNE) )
+ {
+uint8_t  Received_Byte = USART2->DR; // Gelen bilgi degisken içine alinir.
+ USART2->DR = Received_Byte; // Debug monitor icin ayni bilgi usart2'e gonderilir.
+
+// Strstr fonksiyonu için eklendi, modülden null karakteri gelebiliyordu , onu engellemis olduk.
+ if(Received_Byte != 0)
+ {
+ gelenVeri[WriteIndex] = Received_Byte;
+	
+ WriteIndex++;
+ }
+
+}
+}
+
 
 void USART_Puts(USART_TypeDef* USARTx,volatile char *s) // char karakter sayisi kadar döndürüyor
 {
@@ -110,7 +172,7 @@ void USART_Puts(USART_TypeDef* USARTx,volatile char *s) // char karakter sayisi 
 	 *s++;
  }	 
 }	
-
+/*
 char USART_read(void){
 	while(USART_GetFlagStatus(USART2, USART_FLAG_RXNE) == RESET);
   char tmp = USART_ReceiveData(USART2);
@@ -119,7 +181,7 @@ char USART_read(void){
 	     a++;
 	  return tmp;
 }
-
+*/
 void servoup(void){
 		Bekleme();
 	GPIO_InitTypeDef GPIO_InitStructure;
@@ -159,7 +221,7 @@ void servoup(void){
 	//TIM_ARRPreloadConfig(TIM4,ENABLE);
 	
 		Delay(1);
-	   TIM_OCInitStructure.TIM_Pulse=1750;//CCR1_Val; Initial duty cycle
+	   TIM_OCInitStructure.TIM_Pulse=750;//CCR1_Val; Initial duty cycle
 	  TIM_OC1Init(TIM4,&TIM_OCInitStructure);
 	  TIM_OC1PreloadConfig(TIM4,TIM_OCPreload_Enable);
 		Delay(1);
@@ -213,7 +275,7 @@ void servodown(void){
  
 	//TIM_ARRPreloadConfig(TIM4,ENABLE);
 		Delay(1);
-	  TIM_OCInitStructure.TIM_Pulse=1;//CCR1_Val; Initial duty cycle
+	  TIM_OCInitStructure.TIM_Pulse=400;//CCR1_Val; Initial duty cycle
 	  TIM_OC1Init(TIM4,&TIM_OCInitStructure);
 	  TIM_OC1PreloadConfig(TIM4,TIM_OCPreload_Enable);
 		Delay(1);
